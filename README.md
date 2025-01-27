@@ -83,12 +83,12 @@ Pour faire de la **segmentation sémantique** (ou instance/panoptic), on utilise
 
 En d’autres termes :
 
-1. **Backbone (classification)**  
+1. **Backbone (Encoder)**  
    - Réseau initialement conçu pour de la classification (ResNet, MobileNet, etc.).  
    - Rôle : extraire une représentation riche et hiérarchique de l’image.  
    - Souvent **pré-entraîné** sur de larges bases de données (ImageNet), pour accélérer et améliorer la convergence.
 
-2. **Head ou architecture de segmentation**  
+2. **Head ou architecture de segmentation (Decoder)**  
    - Partie additionnelle (decoder, ASPP, pyramid pooling, etc.) qui opère sur les features du backbone.  
    - Rôle : produire un masque de segmentation (en général, de la même dimension spatiale que l’image d’origine, ou proche).  
    - Exemples de “heads” : U-Net (avec upsampling + skip connections), DeepLab (avec ASPP et convolutions dilatées), PSPNet (avec pyramid pooling), etc.
