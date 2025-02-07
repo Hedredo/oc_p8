@@ -8,10 +8,10 @@ dependencies = []
 
 [dependency-groups]
 dev = [
+    "albumentations>=2.0.3",
     "ipykernel>=6.29.5",
     "matplotlib>=3.10.0",
     "pandas>=2.2.3",
-    "scikit-image>=0.25.1",
     "seaborn>=0.13.2",
     "tensorflow>=2.18.0",
 ]
