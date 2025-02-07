@@ -753,6 +753,180 @@ class Dataloaderv7(tf.keras.utils.PyDataset):
         return tf.keras.utils.to_categorical(mask, num_classes=self.num_classes)
 
 
+class Dataloaderv8(tf.keras.utils.PyDataset):
+    def __init__(
+        self,
+        image_folder: pathlib.Path,
+        labels: typing.NamedTuple,
+        batch_size: int,
+        target_size: typing.Tuple[int, int],
+        preview: int = None,  # Load only a subset of the dataset for preview.
+        rgb_norm: bool = True,
+        shuffle: bool = True,
+        label_onehot: bool = False,
+        threadpool: bool = False,
+        **kwargs,
+    ):
+        """
+        Initialize the Dataloaderv8 data generator.
+        """
+        super().__init__(**kwargs)
+
+        # Logger initialization
+        self.logger = self._setup_logger()
+
+        # Set class attributes initialized with constructor arguments
+        self.image_folder = image_folder
+        self.labels = labels
+        self.batch_size = batch_size
+        self.target_size = target_size
+        self.rgb_norm = rgb_norm
+        self.shuffle = shuffle
+        self.label_onehot = label_onehot
+        self.threadpool = threadpool  # If True, use multiprocessing.Pool
+
+        # Get image and mask file paths using pathlib
+        self.image_paths, self.mask_paths = self._load_paths(preview)
+        self._validate_paths()
+
+        # Attributes initialized from labels elements
+        self.table_id2category = {label.id: label.categoryId for label in self.labels}
+        self.num_classes = len(set(self.table_id2category.values()))
+        # Disable PIL logging DEBUG
+        logging.getLogger("PIL").setLevel(logging.WARNING)
+
+        # Shuffle the dataset before starting
+        if self.shuffle:
+            self.on_epoch_end()
+
+    # Initialize logger
+    def _setup_logger(self):
+        logger = logging.getLogger("dataloader")
+        logger.setLevel(logging.DEBUG)
+        return logger
+
+    # Load image and mask paths and apply preview if requested to slice the dataset
+    def _load_paths(self, preview: int):
+        # Get image and mask file paths using pathlib
+        image_paths = sorted(list(self.image_folder.glob("*leftImg8bit.png")))
+        mask_paths = sorted(list(self.image_folder.glob("*labelIds.png")))
+
+        # Apply preview if requested
+        if preview is not None:
+            image_paths = image_paths[:preview]
+            mask_paths = mask_paths[:preview]
+
+        return image_paths, mask_paths
+
+    # Validate that the number of images and masks are equal before starting
+    def _validate_paths(self):
+        if len(self.image_paths) != len(self.mask_paths):
+            self.logger.error(
+                "Number of images (%d) and masks (%d) must be equal.",
+                len(self.image_paths),
+                len(self.mask_paths),
+            )
+            raise ValueError("Number of images and masks must be equal.")
+
+    # Return the number of samples in the dataset using dynamic property
+    @property
+    def num_samples(self):
+        return len(self.image_paths)
+
+    # Class method to return the number of batches in the dataset using len()
+    def __len__(self) -> int:
+        length = math.ceil(self.num_samples / self.batch_size)
+        self.logger.debug(f"Number of batches: {length}")
+        return length
+
+    # Class method to fetch a batch of images and masks with the given index
+    def __getitem__(self, index: int):
+        # Calculate start and end indices for the batch
+        start_idx = index * self.batch_size
+        end_idx = min(start_idx + self.batch_size, self.num_samples)
+        if start_idx >= self.num_samples:
+            raise IndexError("Index out of range")
+        # Fetch batch image and mask paths using start and end indices
+        batch_images_paths = self.image_paths[start_idx:end_idx]
+        batch_masks_paths = self.mask_paths[start_idx:end_idx]
+        # Log the batch fetching
+        self.logger.debug(
+            f"Fetching batch {index}: start_idx={start_idx}, end_idx={end_idx}"
+        )
+        # Load images and masks using multiprocessing if threadpool is True
+        if self.threadpool:
+            self.use_multiprocessing = False
+            with multiprocessing.Pool() as pool:
+                batch_images = pool.map(self.load_img_to_array, batch_images_paths)
+                batch_masks = pool.map(self.load_mask_to_array, batch_masks_paths)
+                # Transform masks to categorical if label_onehot is True
+                if self.label_onehot:
+                    batch_masks = pool.map(
+                        self.transform_mask_to_categorical, batch_masks
+                    )
+        # Load images and masks using list comprehension if threadpool is False
+        else:
+            batch_images = [self.load_img_to_array(path) for path in batch_images_paths]
+            batch_masks = [self.load_mask_to_array(path) for path in batch_masks_paths]
+            # Transform masks to categorical if label_onehot is True
+            if self.label_onehot:
+                batch_masks = [
+                    self.transform_mask_to_categorical(mask) for mask in batch_masks
+                ]
+        # Return batch images and masks as numpy arrays
+        return np.asarray(batch_images), np.asarray(batch_masks)
+
+    # Shuffle the dataset before starting a new epoch
+    def on_epoch_end(self):
+        if self.shuffle:
+            zip_paths = list(zip(self.image_paths, self.mask_paths))
+            np.random.shuffle(zip_paths)
+            self.image_paths, self.mask_paths = zip(*zip_paths)
+        else:
+            pass
+
+    # Normalize the image array if rgb_norm is True
+    def _normalize_img(self, img_array):
+        return img_array / 255.0
+
+    # Load image to array and normalize if rgb_norm is True
+    def load_img_to_array(self, img_path: pathlib.Path, display_only=False):
+        img = tf.keras.utils.load_img(
+            str(img_path),
+            target_size=self.target_size,
+            color_mode="rgb",
+            interpolation="bilinear",
+        )
+        if display_only:
+            return img
+        img_array = tf.keras.utils.img_to_array(img, dtype=np.float32)
+        return self._normalize_img(img_array) if self.rgb_norm else img_array
+
+    # Load mask to array and map mask ids to categories
+    def load_mask_to_array(self, mask_path: pathlib.Path):
+        mask = tf.keras.utils.load_img(
+            str(mask_path),
+            target_size=self.target_size,
+            color_mode="grayscale",
+            interpolation="nearest",
+        )
+        mask_array = tf.keras.utils.img_to_array(mask, dtype=np.int8)
+        # Map mask ids to categories
+        mapped = np.vectorize(self.table_id2category.get)(mask_array)
+        return mapped.squeeze()
+
+    # Transform mask to categorical one-hot encoding
+    def transform_mask_to_categorical(self, mask):
+        return tf.keras.utils.to_categorical(mask, num_classes=self.num_classes)
+
+    # Return an image and mask pair for visualization with the path
+    def get_image_mask_pair_and_path(self, index: int):
+        img = self.load_img_to_array(self.image_paths[index], display_only=True)
+        img_array = tf.keras.utils.img_to_array(img, dtype=np.float32)
+        mask = self.load_mask_to_array(self.mask_paths[index])
+        return img, self._normalize_img(img_array) if self.rgb_norm else img_array, mask
+
+
 # Dimensions cibles
 TARGET_HEIGHT = 256
 TARGET_WIDTH = 512

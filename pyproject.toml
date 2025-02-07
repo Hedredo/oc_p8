@@ -12,6 +12,7 @@ dev = [
     "ipykernel>=6.29.5",
     "matplotlib>=3.10.0",
     "pandas>=2.2.3",
+    "scikit-learn>=1.6.1",
     "seaborn>=0.13.2",
     "tensorflow>=2.18.0",
 ]
