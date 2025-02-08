@@ -60,54 +60,29 @@ Ce livrable vous permettra de présenter vos résultats à Laura.
 - Check Ressources OC à utiliser au début : https://openclassrooms.com/fr/paths/795/projects/1517/resources
 
 - Helping ressources :
-    - DEEPSEEK : https://www.datacamp.com/blog/deepseek-r1?utm_source=marketo&utm_medium=email&utm_campaign=250128_1-012825newsletter_2-b2b_3-all_4-na_5-bl_6-deepseek_7-en_8-emal-mk_9-na_10-bau_11-email&utm_content=blast&utm_term=lead-news&mkt_tok=MzA3LU9BVC05NjgAAAGYTGlVnPRJCH2k2X9MdUIIyqH8eTVHXb-2m8bzXkiGTU4DAFuCDKVBjwXThnNgSL_P6U1Cqa985CCug5Cvx0jfShQ-MEvPWa-6X9XtTCrpavWoqg
-    - Model + Metrics + Display avec changement d'encodeur en supplément : https://www.geeksforgeeks.org/image-segmentation-using-tensorflow/
-    - Guide to Convolution arithmetics -31 p- : https://arxiv.org/pdf/1603.07285
-    - Cours CS231n :
-        - CNN : https://cs231n.github.io/convolutional-networks/
-        - Understanding & visualizing CNN : https://cs231n.github.io/understanding-cnn/
-        - Transfer Learning : https://cs231n.github.io/transfer-learning/
-    - Image Segmentation with pretrained model with HuggingFace & Tensorflow
-        - https://www.youtube.com/watch?v=oL-xmufhZM8
+    - `Cours CS231n`
+        - [X] CNN : https://cs231n.github.io/convolutional-networks/
+        - [X] Understanding & visualizing CNN : https://cs231n.github.io/understanding-cnn/
+        - [X] Transfer Learning : https://cs231n.github.io/transfer-learning/
+    - `Data generator for images` :
+        - [X] https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
+    - `Metrics for segmentation` :
+        - https://medium.com/@nghihuynh_37300/understanding-evaluation-metrics-in-medical-image-segmentation-d289a373a3f
+        - https://ilmonteux.github.io/2019/05/10/segmentation-metrics.html
+        - https://towardsdatascience.com/metrics-to-evaluate-your-semantic-segmentation-model-6bcb99639aa2
+        - https://www.kaggle.com/code/yassinealouini/all-the-segmentation-metrics#Bonus-3:-metrics-libraries
+        - https://www.geeksforgeeks.org/what-are-different-evaluation-metrics-used-to-evaluate-image-segmentation-models/
+    - `Arithmetics` :
+        - Guide to Convolution arithmetics -31 p- : https://arxiv.org/pdf/1603.07285.pdf
+    - `Image Segmentation with pretrained model with HuggingFace & Tensorflow`
+        - https://www.geeksforgeeks.org/image-segmentation-using-tensorflow/
+        - tensorflow : https://www.tensorflow.org/tutorials/images/segmentation
         - https://huggingface.co/docs/transformers/tasks/semantic_segmentation
         - SOTA models huggingface : https://huggingface.co/blog/mask2former
         - Fine-tuning segformer : https://huggingface.co/blog/fine-tune-segformer
-    - UNET : https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/
-    - Albumentations : https://albumentations.ai/docs/examples/example/
-- Analyse pré-exploratoire et préparation des données
-    - Regarder l'équilibre des catégories avant le train-test-split ? Possible avec np.unique_counts(img_array) sur chaque image (se servir du multiprocessing)
-    - Crée le train test split avec shuffle et 0.2
+    - `UNET` : https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/
+    - `Albumentations` : https://albumentations.ai/docs/examples/example/
+
 
 ## Workflow
 https://docs.google.com/document/d/1kIbxaqzdPZqHEJRxwuFCAar-G8W78VFRgDUEF5Mesjw/edit?invite=CI_q4swC&tab=t.0
-
-
-## To-Do
-- Prétraitement des données
-    - Normalisation des images RGB (vérifier si c'est fait avec load_img)
-
-- Datagenerator (tf.keras.utils.PyDataset) : https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
-    - Dans le init, argument pour dossier + str endswith pour les images et les masks (`le def doit être dans le init`)
-    - A partir de çà générer avec une fonction interne les indexes des images pour le shuffle
-    - Faire une classe DataGenerator unique
-        - avec multiprocessing as a function to call internally et ajouter un arg external_multiprocessing. Si external_multiprocessing = True, set use_multiprocessing = False dans le DataGenerator
-        - avec un argument pour le transform to categorical (si true, alors on fait le to_categorical sur les labels)
-    - Ajouter la normalisation sur le RGB si nécessaire dans load_img
-    - Ajouter la mapping (en valeur fixe dans init) sur le mask avec np.vectorize + le dictionnaire
-    - Ajouter le on_epoch_end pour shuffle les données à chaque epoch sur la liste des indexs (créer une fonction interne pour l'extraction des indexes)
-    - Mettre uniquement le path du dossier dans le DataGenerator et non les images directement (pour pouvoir changer de dataset plus facilement) - cela permets de récupérer les indexes des images pour le shuffle
-    - Ajouter la partie data augmentation (rotation, flip, zoom, etc.)
-    - Appliquer le data loader ensuite sur train - val - test
-
-- Datagenerator (tf.data.Dataser)
-    - Adapter le DataGenerator pour tf.data.Dataset
-    - Internaliser les fonctions dans la classe
-    - Ajouter le mapping (en valeur fixe dans init) sur le mask avec tf.lookup
-    - Remplacer la partie mapping avec np vectorize par tf.lookup (voir email pour le code)
-
-- Modele
-    - Tester avec fit generator pour les perfs ? : https://www.geeksforgeeks.org/keras-fit-and-keras-fit_generator/  ou https://stackoverflow.com/questions/55531427/how-to-define-max-queue-size-workers-and-use-multiprocessing-in-keras-fit-gener
-
-- Ajouter les métriques IoU et Dice
-    - Ajouter les métriques IoU et Dice dans le modèle
-    - Ajouter les métriques IoU et Dice dans le callback
