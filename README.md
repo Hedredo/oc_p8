@@ -67,7 +67,7 @@ Ce livrable vous permettra de présenter vos résultats à Laura.
     - `Data generator for images` :
         - [X] https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
     - `Metrics for segmentation` :
-        - https://medium.com/@nghihuynh_37300/understanding-evaluation-metrics-in-medical-image-segmentation-d289a373a3f
+        - [X] https://medium.com/@nghihuynh_37300/understanding-evaluation-metrics-in-medical-image-segmentation-d289a373a3f
         - https://ilmonteux.github.io/2019/05/10/segmentation-metrics.html
         - https://towardsdatascience.com/metrics-to-evaluate-your-semantic-segmentation-model-6bcb99639aa2
         - https://www.kaggle.com/code/yassinealouini/all-the-segmentation-metrics#Bonus-3:-metrics-libraries
