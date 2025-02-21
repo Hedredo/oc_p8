@@ -6,6 +6,8 @@ import logging
 import pathlib
 import typing
 import albumentations as A
+import matplotlib.pyplot as plt
+
 
 class Dataloaderv1(tf.keras.utils.PyDataset):
     def __init__(self, images, masks, batch_size, target_size, **kwargs):
@@ -1380,3 +1382,907 @@ def create_dataset(folder_path, batch_size=8, preview=None):
     dataset = dataset.batch(batch_size)
     dataset = dataset.prefetch(buffer_size=tf.data.AUTOTUNE)
     return dataset
+
+class Dataloaderv11(tf.keras.utils.PyDataset):
+    def __init__(
+        self,
+        paths: typing.List[pathlib.Path],
+        labels: typing.NamedTuple,
+        batch_size: int,
+        target_size: typing.Tuple[int, int],
+        augmentations: False,
+        preview: int = None,  # Load only a subset of the dataset for preview.
+        normalize: bool = True,
+        shuffle: bool = True,
+        label_onehot: bool = False,
+        threadpool: bool = False,
+        **kwargs,
+    ):
+        """
+        Initialize the Dataloaderv9 data generator.
+        """
+        super().__init__(**kwargs)
+
+        # Logger initialization
+        self.logger = self._setup_logger()
+
+        # Set class attributes initialized with constructor arguments
+        self.paths = paths
+        self.labels = labels
+        self.batch_size = batch_size
+        self.target_size = target_size
+        self.augmentations = augmentations
+        self.normalize = normalize
+        self.shuffle = shuffle
+        self.label_onehot = label_onehot
+        self.threadpool = threadpool
+
+        # Initialize the augmentation pipeline
+        if self.augmentations:
+            self.compose = A.Compose(
+                [
+                    # OneOf Geometrical transformations
+                    A.OneOf(
+                        [
+                            A.HorizontalFlip(p=1.0),
+                            # A.ShiftScaleRotate(shift_limit=0.05, scale_limit=0.1, rotate_limit=5, p=1.0),
+                        ],
+                        p=0.5,
+                    ),
+                    # OneOf Color transformations
+                    A.OneOf(
+                        [
+                            A.RandomBrightnessContrast(
+                                brightness_limit=0.2, contrast_limit=0.2, p=1.0
+                            ),
+                            A.HueSaturationValue(
+                                hue_shift_limit=10,
+                                sat_shift_limit=15,
+                                val_shift_limit=10,
+                                p=1.0,
+                            ),
+                        ],
+                        p=0.5,
+                    ),
+                    # OneOf Blur and Distortion transformations
+                    A.OneOf(
+                        [
+                            A.GaussianBlur(blur_limit=3, p=1.0),
+                            A.MotionBlur(blur_limit=5, p=1.0),
+                            A.OpticalDistortion(distort_limit=0.05, p=1.0),
+                        ],
+                        p=0.25,
+                    ),
+                ]
+            )
+
+        # Get image and mask file paths using pathlib
+        self.image_paths, self.mask_paths = self._load_paths(preview)
+        self._validate_paths()
+
+        # Attributes initialized from labels elements
+        self.table_id2category = {label.id: label.categoryId for label in self.labels}
+        self.num_classes = len(set(self.table_id2category.values()))
+        # Disable PIL logging DEBUG
+        logging.getLogger("PIL").setLevel(logging.WARNING)
+
+        # Shuffle the dataset before starting
+        if self.shuffle:
+            self.on_epoch_end()
+
+    # Initialize logger
+    def _setup_logger(self):
+        logger = logging.getLogger("dataloader")
+        logger.setLevel(logging.ERROR)
+        return logger
+
+    # Load image and mask paths and apply preview if requested to slice the dataset
+    def _load_paths(self, preview: int):
+        # Get image and mask file paths using pathlib
+        image_paths, mask_paths = zip(*self.paths)
+
+        # Apply preview if requested
+        if preview is not None:
+            image_paths = image_paths[:preview]
+            mask_paths = mask_paths[:preview]
+
+        return image_paths, mask_paths
+
+    # Validate that the number of images and masks are equal before starting
+    def _validate_paths(self):
+        if len(self.image_paths) != len(self.mask_paths):
+            self.logger.error(
+                "Number of images (%d) and masks (%d) must be equal.",
+                len(self.image_paths),
+                len(self.mask_paths),
+            )
+            raise ValueError("Number of images and masks must be equal.")
+
+    # Return the number of samples in the dataset using dynamic property
+    @property
+    def num_samples(self):
+        return len(self.image_paths)
+
+    # Class method to return the number of batches in the dataset using len()
+    def __len__(self) -> int:
+        length = math.ceil(self.num_samples / self.batch_size)
+        self.logger.debug(f"Number of batches: {length}")
+        return length
+
+    # Class method to fetch a batch of images and masks with the given index
+    def __getitem__(self, index: int):
+        # Calculate start and end indices for the batch
+        start_idx = index * self.batch_size
+        end_idx = min(start_idx + self.batch_size, self.num_samples)
+        if start_idx >= self.num_samples:
+            raise IndexError("Index out of range")
+
+        # Prépare les paires (image_path, mask_path) du batch
+        batch_paths = list(
+            zip(
+                self.image_paths[start_idx:end_idx],
+                self.mask_paths[start_idx:end_idx],
+            )
+        )
+
+        # Log the batch fetching
+        self.logger.debug(
+            f"Fetching batch {index}: start_idx={start_idx}, end_idx={end_idx}"
+        )
+
+        # Load images and masks using multiprocessing if threadpool is True
+        if self.threadpool:
+            self.use_multiprocessing = False
+            with multiprocessing.Pool() as pool:
+                results = pool.map(self.load_and_augment, batch_paths)
+        # Load images and masks using list comprehension if threadpool is False
+        else:
+            results = [self.load_and_augment(pair) for pair in batch_paths]
+
+        # Return batch images and masks as numpy arrays
+        batch_images, batch_masks = zip(*results)
+        return np.asarray(batch_images), np.asarray(batch_masks)
+
+    # Shuffle the dataset before starting a new epoch
+    def on_epoch_end(self):
+        if self.shuffle:
+            zip_paths = list(zip(self.image_paths, self.mask_paths))
+            np.random.shuffle(zip_paths)
+            self.image_paths, self.mask_paths = zip(*zip_paths)
+        else:
+            pass
+
+    # Normalize the image array if normalize is True
+    def _normalize_img(self, img_array):
+        return img_array / 255.0
+
+        # Transform mask to categorical one-hot encoding
+
+    def _transform_mask_to_categorical(self, mask):
+        return tf.keras.utils.to_categorical(mask, num_classes=self.num_classes)
+
+    # Load image to array and normalize if normalize is True
+    def load_img_to_array(self, img_path: pathlib.Path):
+        img = tf.keras.utils.load_img(
+            str(img_path),
+            target_size=self.target_size,
+            color_mode="rgb",
+            interpolation="bilinear",
+        )
+        img_array = tf.keras.utils.img_to_array(img, dtype=np.float32)
+        if self.normalize:
+            img_array = self._normalize_img(img_array)
+        return img_array
+
+    # Load mask to array and map mask ids to categories
+    def load_mask_to_array(self, mask_path: pathlib.Path):
+        mask = tf.keras.utils.load_img(
+            str(mask_path),
+            target_size=self.target_size,
+            color_mode="grayscale",
+            interpolation="nearest",
+        )
+        mask_array = tf.keras.utils.img_to_array(mask, dtype=np.int8)
+        # Map mask ids to categories
+        mapped = (np.vectorize(self.table_id2category.get)(mask_array)).squeeze()
+        if self.label_onehot:
+            mapped = self._transform_mask_to_categorical(mapped)
+        return mapped
+
+    def load_and_augment(self, paths):
+        img, mask = paths
+        img = self.load_img_to_array(img)
+        mask = self.load_mask_to_array(mask)
+        if self.augmentations:
+            augmented = self.compose(image=img, mask=mask)
+            return augmented["image"], augmented["mask"]
+        else:
+            return img, mask
+
+    # Return an image and mask pair for visualization with the path
+    def get_image_mask_and_paths(self, index: int):
+        paths = self.image_paths[index], self.mask_paths[index]
+        img, mask = self.load_and_augment(paths)
+        return img, mask, *paths
+
+    # Return a prediction from model
+    def get_prediction(self, model, index: int):
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        prediction = model.predict(np.expand_dims(img, axis=0))
+        return prediction.squeeze()
+
+    # Show image, mask transformation
+    def show_transformation(self, index: int, figsize=(10, 6)):
+        # Get image, mask and paths
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        # Display the original and transformed images
+        fig, ax = plt.subplots(2, 2, figsize=figsize)
+        ax[0, 0].imshow(plt.imread(img_path))
+        ax[0, 0].set_title("Original Image")
+        ax[0, 1].imshow(img)
+        ax[0, 1].set_title("Transformed Image")
+        ax[1, 0].imshow(plt.imread(mask_path))
+        ax[1, 0].set_title("Original Mask")
+        ax[1, 1].imshow(mask)
+        ax[1, 1].set_title("Transformed Mask")
+        plt.show()
+
+    # Show image, mask and prediction
+    def show_prediction(self, model, index: int, figsize=(15, 6)):
+        # Get image, mask and paths
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        # Get the prediction
+        preds_mask = self.get_prediction(model, index)
+        preds_mask = np.argmax(preds_mask, axis=-1)
+        # Figure initialization
+        fig = plt.figure(layout="constrained", figsize=figsize)
+        fig.suptitle(f"{model.name} Predictions", fontsize=16)
+        # Subfigures initialization
+        subfigs = fig.subfigures(2, 1, wspace=0.07)
+        axsTop = subfigs[0].subplots(1, 3, sharey=True, sharex=True)
+        axsBottom = subfigs[1].subplots(1, 3, sharey=True, sharex=True)
+        for i, ax in enumerate(axsTop):
+            if i == 0:
+                ax.imshow(img)
+                ax.set_title("Original Image")
+            elif i == 1:
+                ax.imshow(mask, cmap="Greys")
+                ax.set_title("Ground Truth Mask (Grayscale)")
+            else:
+                ax.imshow(mask)
+                ax.set_title("Ground Truth Mask (RGB)")
+            ax.axis("off")
+        for i, ax in enumerate(axsBottom):
+            if i == 0:
+                ax.imshow(img)
+                ax.set_title("Original Image")
+            elif i == 1:
+                ax.imshow(preds_mask, cmap="Greys")
+                ax.set_title("Predicted Mask (Grayscale)")
+            else:
+                ax.imshow(preds_mask)
+                ax.set_title("Predicted Mask (RGB)")
+            ax.axis("off")
+        plt.show()
+
+
+class Dataloaderv12(tf.keras.utils.PyDataset):
+    def __init__(
+        self,
+        paths: typing.List[pathlib.Path],
+        labels: typing.NamedTuple,
+        batch_size: int,
+        target_size: typing.Tuple[int, int],
+        augmentations: False,
+        preview: int = None,  # Load only a subset of the dataset for preview.
+        normalize: bool = True,
+        shuffle: bool = True,
+        label_onehot: bool = False,
+        threadpool: bool = False,
+        class_weights: typing.List[float] = None,
+        **kwargs,
+    ):
+        """
+        Initialize the Dataloaderv9 data generator.
+        """
+        super().__init__(**kwargs)
+
+        # Logger initialization
+        self.logger = self._setup_logger()
+
+        # Set class attributes initialized with constructor arguments
+        self.paths = paths
+        self.labels = labels
+        self.batch_size = batch_size
+        self.target_size = target_size
+        self.augmentations = augmentations
+        self.normalize = normalize
+        self.shuffle = shuffle
+        self.label_onehot = label_onehot
+        self.threadpool = threadpool
+        self.class_weights = class_weights
+
+        # Initialize the augmentation pipeline
+        if self.augmentations:
+            self.compose = A.Compose(
+                [
+                    # OneOf Geometrical transformations
+                    A.OneOf(
+                        [
+                            A.HorizontalFlip(p=1.0),
+                        ],
+                        p=0.5,
+                    ),
+                    # OneOf Color transformations
+                    A.OneOf(
+                        [
+                            A.RandomBrightnessContrast(
+                                brightness_limit=0.2, contrast_limit=0.2, p=1.0
+                            ),
+                            A.HueSaturationValue(
+                                hue_shift_limit=10,
+                                sat_shift_limit=15,
+                                val_shift_limit=10,
+                                p=1.0,
+                            ),
+                        ],
+                        p=0.5,
+                    ),
+                    # OneOf Blur and Distortion transformations
+                    A.OneOf(
+                        [
+                            A.GaussianBlur(blur_limit=3, p=1.0),
+                            A.MotionBlur(blur_limit=5, p=1.0),
+                            A.OpticalDistortion(distort_limit=0.05, p=1.0),
+                        ],
+                        p=0.25,
+                    ),
+                ]
+            )
+
+        # Get image and mask file paths using pathlib
+        self.image_paths, self.mask_paths = self._load_paths(preview)
+        self._validate_paths()
+
+        # Attributes initialized from labels elements
+        self.table_id2category = {label.id: label.categoryId for label in self.labels}
+        self.num_classes = len(set(self.table_id2category.values()))
+        # Disable PIL logging DEBUG
+        logging.getLogger("PIL").setLevel(logging.WARNING)
+
+        # Shuffle the dataset before starting
+        if self.shuffle:
+            self.on_epoch_end()
+
+    # Nouvelle méthode pour calculer les sample weights
+    def _add_sample_weights(self, image, label):
+        # Génère un tableau de sample weights en utilisant le label comme index
+        sample_weights = tf.gather(self.class_weights, indices=tf.cast(label, tf.int32))
+        return image, label, sample_weights
+
+    # Initialize logger
+    def _setup_logger(self):
+        logger = logging.getLogger("dataloader")
+        logger.setLevel(logging.ERROR)
+        return logger
+
+    # Load image and mask paths and apply preview if requested to slice the dataset
+    def _load_paths(self, preview: int):
+        # Get image and mask file paths using pathlib
+        image_paths, mask_paths = zip(*self.paths)
+
+        # Apply preview if requested
+        if preview is not None:
+            image_paths = image_paths[:preview]
+            mask_paths = mask_paths[:preview]
+
+        return image_paths, mask_paths
+
+    # Validate that the number of images and masks are equal before starting
+    def _validate_paths(self):
+        if len(self.image_paths) != len(self.mask_paths):
+            self.logger.error(
+                "Number of images (%d) and masks (%d) must be equal.",
+                len(self.image_paths),
+                len(self.mask_paths),
+            )
+            raise ValueError("Number of images and masks must be equal.")
+
+    # Return the number of samples in the dataset using dynamic property
+    @property
+    def num_samples(self):
+        return len(self.image_paths)
+
+    # Class method to return the number of batches in the dataset using len()
+    def __len__(self) -> int:
+        length = math.ceil(self.num_samples / self.batch_size)
+        self.logger.debug(f"Number of batches: {length}")
+        return length
+
+    # Class method to fetch a batch of images and masks with the given index
+    def __getitem__(self, index: int):
+        # Calculate start and end indices for the batch
+        start_idx = index * self.batch_size
+        end_idx = min(start_idx + self.batch_size, self.num_samples)
+        if start_idx >= self.num_samples:
+            raise IndexError("Index out of range")
+
+        # Prépare les paires (image_path, mask_path) du batch
+        batch_paths = list(
+            zip(
+                self.image_paths[start_idx:end_idx],
+                self.mask_paths[start_idx:end_idx],
+            )
+        )
+
+        # Log the batch fetching
+        self.logger.debug(
+            f"Fetching batch {index}: start_idx={start_idx}, end_idx={end_idx}"
+        )
+
+        # Load images and masks using multiprocessing if threadpool is True
+        if self.threadpool:
+            self.use_multiprocessing = False
+            with multiprocessing.Pool() as pool:
+                results = pool.map(self.load_and_augment, batch_paths)
+        # Load images and masks using list comprehension if threadpool is False
+        else:
+            results = [self.load_and_augment(pair) for pair in batch_paths]
+
+        # Return batch images and masks as numpy arrays
+        batch_images, batch_masks = zip(*results)
+        batch_images = np.asarray(batch_images)
+        batch_masks = np.asarray(batch_masks)
+
+        if self.class_weights is not None:
+            # Pour chaque exemple, calcul des sample weights
+            images_sw = []
+            masks_sw = []
+            sw_weights = []
+            for img, mask in zip(batch_images, batch_masks):
+                image, label, sample_weight = self._add_sample_weights(img, mask)
+                images_sw.append(image)
+                masks_sw.append(label)
+                # Conversion en numpy si besoin
+                sw_weights.append(
+                    sample_weight.numpy()
+                    if hasattr(sample_weight, "numpy")
+                    else sample_weight
+                )
+            return np.asarray(images_sw), np.asarray(masks_sw), np.asarray(sw_weights)
+        else:
+            return batch_images, batch_masks
+
+    # Shuffle the dataset before starting a new epoch
+    def on_epoch_end(self):
+        if self.shuffle:
+            zip_paths = list(zip(self.image_paths, self.mask_paths))
+            np.random.shuffle(zip_paths)
+            self.image_paths, self.mask_paths = zip(*zip_paths)
+        else:
+            pass
+
+    # Normalize the image array if normalize is True
+    def _normalize_img(self, img_array):
+        return img_array / 255.0
+
+        # Transform mask to categorical one-hot encoding
+
+    def _transform_mask_to_categorical(self, mask):
+        return tf.keras.utils.to_categorical(mask, num_classes=self.num_classes)
+
+    # Load image to array and normalize if normalize is True
+    def load_img_to_array(self, img_path: pathlib.Path):
+        img = tf.keras.utils.load_img(
+            str(img_path),
+            target_size=self.target_size,
+            color_mode="rgb",
+            interpolation="bilinear",
+        )
+        img_array = tf.keras.utils.img_to_array(img, dtype=np.float32)
+        if self.normalize:
+            img_array = self._normalize_img(img_array)
+        return img_array
+
+    # Load mask to array and map mask ids to categories
+    def load_mask_to_array(self, mask_path: pathlib.Path):
+        mask = tf.keras.utils.load_img(
+            str(mask_path),
+            target_size=self.target_size,
+            color_mode="grayscale",
+            interpolation="nearest",
+        )
+        mask_array = tf.keras.utils.img_to_array(mask, dtype=np.int8)
+        # Map mask ids to categories
+        mapped = (np.vectorize(self.table_id2category.get)(mask_array)).squeeze()
+        if self.label_onehot:
+            mapped = self._transform_mask_to_categorical(mapped)
+        return mapped
+
+    def load_and_augment(self, paths):
+        img, mask = paths
+        img = self.load_img_to_array(img)
+        mask = self.load_mask_to_array(mask)
+        if self.augmentations:
+            augmented = self.compose(image=img, mask=mask)
+            return augmented["image"], augmented["mask"]
+        else:
+            return img, mask
+
+    # Return an image and mask pair for visualization with the path
+    def get_image_mask_and_paths(self, index: int):
+        paths = self.image_paths[index], self.mask_paths[index]
+        img, mask = self.load_and_augment(paths)
+        return img, mask, *paths
+
+    # Return a prediction from model
+    def get_prediction(self, model, index: int):
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        prediction = model.predict(np.expand_dims(img, axis=0))
+        return prediction.squeeze()
+
+    # Show image, mask transformation
+    def show_transformation(self, index: int, figsize=(10, 6)):
+        # Get image, mask and paths
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        # Display the original and transformed images
+        fig, ax = plt.subplots(2, 2, figsize=figsize)
+        ax[0, 0].imshow(plt.imread(img_path))
+        ax[0, 0].set_title("Original Image")
+        ax[0, 1].imshow(img)
+        ax[0, 1].set_title("Transformed Image")
+        ax[1, 0].imshow(plt.imread(mask_path))
+        ax[1, 0].set_title("Original Mask")
+        ax[1, 1].imshow(mask)
+        ax[1, 1].set_title("Transformed Mask")
+        plt.show()
+
+    # Show image, mask and prediction
+    def show_prediction(self, model, index: int, figsize=(15, 6)):
+        # Get image, mask and paths
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        # Get the prediction
+        preds_mask = self.get_prediction(model, index)
+        preds_mask = np.argmax(preds_mask, axis=-1)
+        # Figure initialization
+        fig = plt.figure(layout="constrained", figsize=figsize)
+        fig.suptitle(f"{model.name} Predictions", fontsize=16)
+        # Subfigures initialization
+        subfigs = fig.subfigures(2, 1, wspace=0.07)
+        axsTop = subfigs[0].subplots(1, 3, sharey=True, sharex=True)
+        axsBottom = subfigs[1].subplots(1, 3, sharey=True, sharex=True)
+        for i, ax in enumerate(axsTop):
+            if i == 0:
+                ax.imshow(img)
+                ax.set_title("Original Image")
+            elif i == 1:
+                ax.imshow(mask, cmap="Greys")
+                ax.set_title("Ground Truth Mask (Grayscale)")
+            else:
+                ax.imshow(mask)
+                ax.set_title("Ground Truth Mask (RGB)")
+            ax.axis("off")
+        for i, ax in enumerate(axsBottom):
+            if i == 0:
+                ax.imshow(img)
+                ax.set_title("Original Image")
+            elif i == 1:
+                ax.imshow(preds_mask, cmap="Greys")
+                ax.set_title("Predicted Mask (Grayscale)")
+            else:
+                ax.imshow(preds_mask)
+                ax.set_title("Predicted Mask (RGB)")
+            ax.axis("off")
+        plt.show()
+
+class Dataloaderv13(tf.keras.utils.PyDataset):
+    def __init__(
+        self,
+        paths: typing.List[pathlib.Path],
+        labels: typing.NamedTuple,
+        batch_size: int,
+        target_size: typing.Tuple[int, int],
+        augmentations: False,
+        preview: int = None,  # Load only a subset of the dataset for preview.
+        normalize: bool = True,
+        shuffle: bool = True,
+        label_onehot: bool = False,
+        threadpool: bool = False,
+        class_weights: typing.List[float] = None,
+        **kwargs,
+    ):
+        """
+        Initialize the Dataloaderv13 data generator.
+        """
+        super().__init__(**kwargs)
+
+        # Logger initialization
+        self.logger = self._setup_logger()
+
+        # Set class attributes initialized with constructor arguments
+        self.paths = paths
+        self.labels = labels
+        self.batch_size = batch_size
+        self.target_size = target_size
+        self.augmentations = augmentations
+        self.normalize = normalize
+        self.shuffle = shuffle
+        self.label_onehot = label_onehot
+        self.threadpool = threadpool
+        self.class_weights = class_weights
+
+        # Initialize the augmentation pipeline
+        if self.augmentations:
+            self.compose = A.Compose(
+                [
+                    # OneOf Geometrical transformations
+                    A.OneOf(
+                        [
+                            A.HorizontalFlip(p=1.0),
+                            A.ShiftScaleRotate(
+                                shift_limit=0.05, scale_limit=0.1, rotate_limit=5, p=1.0
+                            ),
+                        ],
+                        p=0.5,
+                    ),
+                    # OneOf Color transformations
+                    A.OneOf(
+                        [
+                            A.RandomBrightnessContrast(
+                                brightness_limit=0.2, contrast_limit=0.2, p=1.0
+                            ),
+                            A.HueSaturationValue(
+                                hue_shift_limit=10,
+                                sat_shift_limit=15,
+                                val_shift_limit=10,
+                                p=1.0,
+                            ),
+                        ],
+                        p=0.5,
+                    ),
+                    # OneOf Blur and Distortion transformations
+                    A.OneOf(
+                        [
+                            A.GaussianBlur(blur_limit=3, p=1.0),
+                            A.MotionBlur(blur_limit=5, p=1.0),
+                            A.OpticalDistortion(distort_limit=0.05, p=1.0),
+                        ],
+                        p=0.25,
+                    ),
+                ]
+            )
+
+        # Get image and mask file paths using pathlib
+        self.image_paths, self.mask_paths = self._load_paths(preview)
+        self._validate_paths()
+
+        # Attributes initialized from labels elements
+        self.table_id2category = {label.id: label.categoryId for label in self.labels}
+        self.num_classes = len(set(self.table_id2category.values()))
+        # Disable PIL logging DEBUG
+        logging.getLogger("PIL").setLevel(logging.WARNING)
+
+        # Shuffle the dataset before starting
+        if self.shuffle:
+            self.on_epoch_end()
+
+    # Nouvelle méthode pour calculer les sample weights
+    def _add_sample_weights(self, image, label):
+        # Génère un tableau de sample weights en utilisant le label comme index
+        sample_weights = tf.gather(self.class_weights, indices=tf.cast(label, tf.int32))
+        return image, label, sample_weights
+
+    # Initialize logger
+    def _setup_logger(self):
+        logger = logging.getLogger("dataloader")
+        logger.setLevel(logging.ERROR)
+        return logger
+
+    # Load image and mask paths and apply preview if requested to slice the dataset
+    def _load_paths(self, preview: int):
+        # Get image and mask file paths using pathlib
+        image_paths, mask_paths = zip(*self.paths)
+
+        # Apply preview if requested
+        if preview is not None:
+            image_paths = image_paths[:preview]
+            mask_paths = mask_paths[:preview]
+
+        return image_paths, mask_paths
+
+    # Validate that the number of images and masks are equal before starting
+    def _validate_paths(self):
+        if len(self.image_paths) != len(self.mask_paths):
+            self.logger.error(
+                "Number of images (%d) and masks (%d) must be equal.",
+                len(self.image_paths),
+                len(self.mask_paths),
+            )
+            raise ValueError("Number of images and masks must be equal.")
+
+    # Return the number of samples in the dataset using dynamic property
+    @property
+    def num_samples(self):
+        return len(self.image_paths)
+
+    # Class method to return the number of batches in the dataset using len()
+    def __len__(self) -> int:
+        length = math.ceil(self.num_samples / self.batch_size)
+        self.logger.debug(f"Number of batches: {length}")
+        return length
+
+    # Class method to fetch a batch of images and masks with the given index
+    def __getitem__(self, index: int):
+        # Calculate start and end indices for the batch
+        start_idx = index * self.batch_size
+        end_idx = min(start_idx + self.batch_size, self.num_samples)
+        if start_idx >= self.num_samples:
+            raise IndexError("Index out of range")
+
+        # Prépare les paires (image_path, mask_path) du batch
+        batch_paths = list(
+            zip(
+                self.image_paths[start_idx:end_idx],
+                self.mask_paths[start_idx:end_idx],
+            )
+        )
+
+        # Log the batch fetching
+        self.logger.debug(
+            f"Fetching batch {index}: start_idx={start_idx}, end_idx={end_idx}"
+        )
+
+        # Load images and masks using multiprocessing if threadpool is True
+        if self.threadpool:
+            self.use_multiprocessing = False
+            # with multiprocessing.Pool() as pool:
+            #    results = pool.map(self.load_and_augment, batch_paths)
+        # Load images and masks using list comprehension if threadpool is False
+        else:
+            results = [self.load_and_augment(pair) for pair in batch_paths]
+
+        # Return batch images and masks as numpy arrays
+        batch_images, batch_masks = zip(*results)
+        batch_images = np.asarray(batch_images)
+        batch_masks = np.asarray(batch_masks)
+
+        if self.class_weights is not None:
+            # Pour chaque exemple, calcul des sample weights
+            images_sw = []
+            masks_sw = []
+            sw_weights = []
+            for img, mask in zip(batch_images, batch_masks):
+                image, label, sample_weight = self._add_sample_weights(img, mask)
+                images_sw.append(image)
+                masks_sw.append(label)
+                # Conversion en numpy si besoin
+                sw_weights.append(
+                    sample_weight.numpy()
+                    if hasattr(sample_weight, "numpy")
+                    else sample_weight
+                )
+            return np.asarray(images_sw), np.asarray(masks_sw), np.asarray(sw_weights)
+        else:
+            return batch_images, batch_masks
+
+    # Shuffle the dataset before starting a new epoch
+    def on_epoch_end(self):
+        if self.shuffle:
+            zip_paths = list(zip(self.image_paths, self.mask_paths))
+            np.random.shuffle(zip_paths)
+            self.image_paths, self.mask_paths = zip(*zip_paths)
+        else:
+            pass
+
+    # Normalize the image array if normalize is True
+    def _normalize_img(self, img_array):
+        return img_array / 255.0
+
+        # Transform mask to categorical one-hot encoding
+
+    def _transform_mask_to_categorical(self, mask):
+        return tf.keras.utils.to_categorical(mask, num_classes=self.num_classes)
+
+    # Load image to array and normalize if normalize is True
+    def load_img_to_array(self, img_path: pathlib.Path):
+        img = tf.keras.utils.load_img(
+            str(img_path),
+            target_size=self.target_size,
+            color_mode="rgb",
+            interpolation="bilinear",
+        )
+        img_array = tf.keras.utils.img_to_array(img, dtype=np.float32)
+        if self.normalize:
+            img_array = self._normalize_img(img_array)
+        return img_array
+
+    # Load mask to array and map mask ids to categories
+    def load_mask_to_array(self, mask_path: pathlib.Path):
+        mask = tf.keras.utils.load_img(
+            str(mask_path),
+            target_size=self.target_size,
+            color_mode="grayscale",
+            interpolation="nearest",
+        )
+        mask_array = tf.keras.utils.img_to_array(mask, dtype=np.int8)
+        # Map mask ids to categories
+        mapped = (np.vectorize(self.table_id2category.get)(mask_array)).squeeze()
+        if self.label_onehot:
+            mapped = self._transform_mask_to_categorical(mapped)
+        return mapped
+
+    def load_and_augment(self, paths):
+        img, mask = paths
+        img = self.load_img_to_array(img)
+        mask = self.load_mask_to_array(mask)
+        if self.augmentations:
+            augmented = self.compose(image=img, mask=mask)
+            return augmented["image"], augmented["mask"]
+        else:
+            return img, mask
+
+    # Return an image and mask pair for visualization with the path
+    def get_image_mask_and_paths(self, index: int):
+        paths = self.image_paths[index], self.mask_paths[index]
+        img, mask = self.load_and_augment(paths)
+        return img, mask, *paths
+
+    # Return a prediction from model
+    def get_prediction(self, model, index: int):
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        prediction = model.predict(np.expand_dims(img, axis=0))
+        return prediction.squeeze()
+
+    # Show image, mask transformation
+    def show_transformation(self, index: int, figsize=(10, 6)):
+        # Get image, mask and paths
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        # Display the original and transformed images
+        fig, ax = plt.subplots(2, 2, figsize=figsize)
+        ax[0, 0].imshow(plt.imread(img_path))
+        ax[0, 0].set_title("Original Image")
+        ax[0, 1].imshow(img)
+        ax[0, 1].set_title("Transformed Image")
+        ax[1, 0].imshow(plt.imread(mask_path))
+        ax[1, 0].set_title("Original Mask")
+        ax[1, 1].imshow(mask)
+        ax[1, 1].set_title("Transformed Mask")
+        plt.show()
+
+    # Show image, mask and prediction
+    def show_prediction(self, model, index: int, figsize=(15, 6)):
+        # Get image, mask and paths
+        img, mask, img_path, mask_path = self.get_image_mask_and_paths(index)
+        # Get the prediction
+        preds_mask = self.get_prediction(model, index)
+        preds_mask = np.argmax(preds_mask, axis=-1)
+        # Figure initialization
+        fig = plt.figure(layout="constrained", figsize=figsize)
+        fig.suptitle(f"{model.name} Predictions", fontsize=16)
+        # Subfigures initialization
+        subfigs = fig.subfigures(2, 1, wspace=0.07)
+        axsTop = subfigs[0].subplots(1, 3, sharey=True, sharex=True)
+        axsBottom = subfigs[1].subplots(1, 3, sharey=True, sharex=True)
+        for i, ax in enumerate(axsTop):
+            if i == 0:
+                ax.imshow(img)
+                ax.set_title("Original Image")
+            elif i == 1:
+                ax.imshow(mask, cmap="Greys")
+                ax.set_title("Ground Truth Mask (Grayscale)")
+            else:
+                ax.imshow(mask)
+                ax.set_title("Ground Truth Mask (RGB)")
+            ax.axis("off")
+        for i, ax in enumerate(axsBottom):
+            if i == 0:
+                ax.imshow(img)
+                ax.set_title("Original Image")
+            elif i == 1:
+                ax.imshow(preds_mask, cmap="Greys")
+                ax.set_title("Predicted Mask (Grayscale)")
+            else:
+                ax.imshow(preds_mask)
+                ax.set_title("Predicted Mask (RGB)")
+            ax.axis("off")
+        plt.show()
