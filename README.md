@@ -56,39 +56,3 @@ Ce livrable vous servira à présenter votre démarche technique à vos collègu
 Ce livrable vous permettra de présenter vos résultats à Laura.
 
 
-## Learning
-- Check Ressources OC à utiliser au début : https://openclassrooms.com/fr/paths/795/projects/1517/resources
-
-- Helping ressources :
-    - `Cours CS231n`
-        - [X] CNN : https://cs231n.github.io/convolutional-networks/
-        - [X] Understanding & visualizing CNN : https://cs231n.github.io/understanding-cnn/
-        - [X] Transfer Learning : https://cs231n.github.io/transfer-learning/
-    - `Data generator for images` :
-        - [X] https://stanford.edu/~shervine/blog/keras-how-to-generate-data-on-the-fly
-    - `Metrics for segmentation` :
-        - [X] https://medium.com/@nghihuynh_37300/understanding-evaluation-metrics-in-medical-image-segmentation-d289a373a3f
-        - [X] https://ilmonteux.github.io/2019/05/10/segmentation-metrics.html
-        - [X] https://towardsdatascience.com/metrics-to-evaluate-your-semantic-segmentation-model-6bcb99639aa2
-        - [X] Loss & Metrics https://www.kaggle.com/code/yassinealouini/all-the-segmentation-metrics#Bonus-3:-metrics-libraries
-        - [X] https://www.geeksforgeeks.org/what-are-different-evaluation-metrics-used-to-evaluate-image-segmentation-models/
-        - [X] Keras segmentation metrics : https://keras.io/api/metrics/segmentation_metrics/
-    - `Arithmetics` :
-        - Guide to Convolution arithmetics -31 p- : https://arxiv.org/pdf/1603.07285.pdf
-    - `Image Segmentation with pretrained model with HuggingFace & Tensorflow`
-        - [X] https://www.geeksforgeeks.org/image-segmentation-using-tensorflow/
-        - [X] tensorflow : https://www.tensorflow.org/tutorials/images/segmentation
-        - Librairie segmentation models : https://github.com/qubvel/segmentation_models
-        - Load a pretrained model from huggingface : https://huggingface.co/docs/transformers/tasks/semantic_segmentation
-        - SOTA models huggingface : https://huggingface.co/blog/mask2former
-        - Fine-tuning segformer : https://huggingface.co/blog/fine-tune-segformer
-        - Deeplabv3 + MobileNetV2 : https://www.tensorflow.org/tfmodels/vision/semantic_segmentation
-
-    - `UNET` : 
-        - [X] https://lmb.informatik.uni-freiburg.de/people/ronneber/u-net/
-    - `Albumentations` : 
-        - [X] https://albumentations.ai/docs/examples/example/
-
-
-## Workflow
-https://docs.google.com/document/d/1kIbxaqzdPZqHEJRxwuFCAar-G8W78VFRgDUEF5Mesjw/edit?invite=CI_q4swC&tab=t.0
