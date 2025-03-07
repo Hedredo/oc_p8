@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Image segmentation for self-driving cars"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "fastapi[standard]>=0.115.11",
+    "gradio>=5.20.1",
+]
 
 [dependency-groups]
 dev = [
@@ -24,3 +27,10 @@ dev = [
 ]
 test = []
 prod = []
+transformers = [
+    "fastapi>=0.115.11",
+    "requests>=2.32.3",
+    "torch>=2.6.0",
+    "transformers>=4.49.0",
+    "uvicorn>=0.34.0",
+]
