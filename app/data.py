@@ -1,12 +1,18 @@
+# Description: This module contains the ImageSegmentationDataset class, which is a subclass of tf.keras.utils.Sequence.
+#              It is used to load and preprocess image and mask data for image segmentation tasks.
+#              The class also provides methods for data augmentation, visualization, and prediction.
+
+# Import necessary libraries
+import typing
+import pathlib
+import math
+from functools import cached_property
+# Import third-party libraries
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
-import math
-import typing
-import pathlib
 import segmentation_models as sm
 import albumentations as A
-from functools import cached_property
 
 
 class ImageSegmentationDataset(tf.keras.utils.Sequence):

@@ -11,8 +11,8 @@ from io import BytesIO
 from PIL import Image
 from pathlib import Path
 from tensorflow.keras.models import load_model
-from utils_and_constants import labels, TARGET_SIZE
-from data import ImageSegmentationDataset, DiceFocalLoss
+from app.utils_and_constants import labels, TARGET_SIZE
+from app.data import ImageSegmentationDataset, DiceFocalLoss
 
 
 app = FastAPI()
