@@ -11,18 +11,19 @@ from io import BytesIO
 from PIL import Image
 from pathlib import Path
 from tensorflow.keras.models import load_model
-from app.utils_and_constants import labels, TARGET_SIZE
-from app.data import ImageSegmentationDataset, DiceFocalLoss
+from utils_and_constants import labels, TARGET_SIZE
+from data import ImageSegmentationDataset, DiceFocalLoss
 
 
 app = FastAPI()
 
 # Dossier temporaire pour stocker les images
-TEMP_DIR = Path("./temp_images")
+cwd = Path(__file__).parent
+TEMP_DIR = cwd / "temp_images"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # constants.py
-model_path = "./artifacts/best_model.keras"
+model_path = cwd / "artifacts" / "best_model.keras"
 
 model = load_model(
     model_path,

@@ -11,9 +11,10 @@ import os
 from PIL import Image
 from pathlib import Path
 from constants import IMAGE_FOLDER
-from utils_and_constants import labels
+from utils_and_constants import labels, API_HOST
 
-folder_path = Path(os.getcwd()) / IMAGE_FOLDER
+cwd = Path(__file__).parent
+folder_path = cwd / IMAGE_FOLDER
 filenames = os.listdir(folder_path)
 ids = sorted(set(filename.split("_")[2] for filename in filenames))
 
@@ -62,7 +63,7 @@ async def segment_image(id):
 
     # Envoyer la requête POST en mode asynchrone
     async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post("http://127.0.0.1:8000/predict/", json=payload)
+        response = await client.post(f"http://{API_HOST}:8000/predict/", json=payload)
         response.raise_for_status()  # Lève une exception si le code HTTP n'est pas 200
     
     try:
@@ -128,4 +129,5 @@ with gr.Blocks() as demo:
             submit_btn = gr.Button("Segmenter")
             submit_btn.click(segment_image, inputs=dropdown, outputs=[gt_output, pred_output, score_output, df_output])
 
-demo.launch(share=False, allowed_paths=[IMAGE_FOLDER])
+if __name__ == "__main__":
+    demo.launch(share=False, allowed_paths=[IMAGE_FOLDER], server_name="0.0.0.0", server_port=7860)
