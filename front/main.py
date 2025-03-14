@@ -5,8 +5,6 @@ import numpy as np
 import json
 import base64
 from io import BytesIO
-import io
-import requests
 import os
 from PIL import Image
 from pathlib import Path
@@ -30,7 +28,6 @@ example_files = {
 }
 
 # Fonction pour charger l'image sélectionnée
-# Fonction pour charger l'image sélectionnée
 def load_example(id):
     return example_files[id][0]
 
@@ -40,7 +37,7 @@ def load_gt(id):
 # Fonction pour encoder une image en base64
 def encode_image(image_path):
     img = Image.open(image_path).convert("RGB")  # Convertir en RGB si nécessaire
-    buffer = io.BytesIO()
+    buffer = BytesIO()
     img.save(buffer, format="PNG", optimize=True)  # Compression sans perte
     encoded_string = base64.b64encode(buffer.getvalue()).decode("utf-8")  # Convertir en string base64
     return encoded_string

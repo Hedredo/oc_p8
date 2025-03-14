@@ -10,7 +10,6 @@ from functools import cached_property
 # Import third-party libraries
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
 import segmentation_models as sm
 import albumentations as A
 
@@ -371,94 +370,6 @@ class ImageSegmentationDataset(tf.keras.utils.Sequence):
                 return mask_pred.squeeze()
             else:
                 return np.argmax(mask_pred.squeeze(), axis=-1)
-
-    def show_transformation(self, index: int, figsize=(12, 8)):
-        """
-        Display the original and transformed images and masks for a given sample.
-
-        Args:
-            index (int): Index of the sample.
-            figsize (tuple, optional): Figure size for the plot. Defaults to (10, 6).
-        """
-        # Retrieve sample data and file paths
-        img, mask, paths = self.get_image_and_mask(index)
-        img_path, mask_path = paths
-
-        # If one-hot encoding is enabled, convert mask back to its sparse format
-        if self.label_onehot:
-            mask = np.argmax(mask, axis=-1)
-        if isinstance(self.normalize, str):
-            img = (img - img.min()) / (img.max() - img.min())
-        # Prepare subplots for original and transformed images/masks
-        fig, ax = plt.subplots(2, 2, figsize=figsize)
-        fig.suptitle("Image and Mask before/after Transformation", fontsize=16)
-        ax[0, 0].imshow(plt.imread(img_path))
-        ax[0, 0].set_title("Original Image")
-        ax[0, 1].imshow(img)
-        ax[0, 1].set_title("Transformed Image")
-        ax[1, 0].imshow(plt.imread(mask_path))
-        ax[1, 0].set_title("Original Mask")
-        ax[1, 1].imshow(mask)
-        ax[1, 1].set_title("Transformed Mask")
-        for a in ax.ravel():
-            a.axis("off")
-        plt.tight_layout()
-        plt.show()
-
-    def show_prediction(self, model, index: int, figname: str, figsize=(15, 6)):
-        """
-        Display the original image, ground truth, and model prediction for a sample.
-
-        Args:
-            model: A trained segmentation model.
-            index (int): Index of the sample.
-            figsize (tuple, optional): Figure size for the plot. Defaults to (15, 6).
-        """
-        # Retrieve processed sample and generate prediction
-        img, mask, _ = self.get_image_and_mask(index)
-        mask_pred = self.get_prediction(model, index)
-
-        # If one-hot encoding is enabled, convert mask back to its sparse format
-        if self.label_onehot:
-            mask = np.argmax(mask, axis=-1)
-        if isinstance(self.normalize, str):
-            img = (img - img.min()) / (img.max() - img.min())
-
-        # Initialize figure with a constrained layout
-        fig = plt.figure(layout="constrained", figsize=figsize)
-        fig.suptitle(f"{figname} Predictions", fontsize=16)
-
-        # Create top and bottom subfigures for comparing ground truth and predictions
-        subfigs = fig.subfigures(2, 1, wspace=0.07)
-        axsTop = subfigs[0].subplots(1, 3, sharey=True, sharex=True)
-        axsBottom = subfigs[1].subplots(1, 3, sharey=True, sharex=True)
-
-        # Plot original image, ground truth mask (grayscale and RGB)
-        for i, ax in enumerate(axsTop):
-            if i == 0:
-                ax.imshow(img)
-                ax.set_title("Original Image")
-            elif i == 1:
-                ax.imshow(mask, cmap="Greys")
-                ax.set_title("Ground Truth Mask (Grayscale)")
-            else:
-                ax.imshow(mask)
-                ax.set_title("Ground Truth Mask (RGB)")
-            ax.axis("off")
-
-        # Plot original image, predicted mask (grayscale and RGB)
-        for i, ax in enumerate(axsBottom):
-            if i == 0:
-                ax.imshow(img)
-                ax.set_title("Original Image")
-            elif i == 1:
-                ax.imshow(mask_pred, cmap="Greys")
-                ax.set_title("Predicted Mask (Grayscale)")
-            else:
-                ax.imshow(mask_pred)
-                ax.set_title("Predicted Mask (RGB)")
-            ax.axis("off")
-        plt.show()
 
 # Create a class from tf.keras.losses.Loss combining dice loss and focal loss
 class DiceFocalLoss(tf.keras.losses.Loss):

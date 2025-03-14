@@ -1,8 +1,7 @@
-from fastapi import FastAPI, UploadFile, File
-from pydantic import BaseModel, Base64Str
+from fastapi import FastAPI, UploadFile
+from pydantic import BaseModel
 import segmentation_models as sm
 import numpy as np
-import json
 import shutil
 import os
 import uuid
