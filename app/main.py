@@ -22,7 +22,7 @@ TEMP_DIR = cwd / "temp_images"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # constants.py
-model_path = cwd / "artifacts" / "best_model.keras"
+model_path = cwd / "model" / "best_model.keras"
 
 model = load_model(
     model_path,
