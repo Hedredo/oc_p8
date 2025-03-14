@@ -1,15 +1,16 @@
-from fastapi import FastAPI, UploadFile
-from pydantic import BaseModel
-import segmentation_models as sm
-import numpy as np
 import shutil
 import os
 import uuid
+from pathlib import Path
 import base64
 from io import BytesIO
 from PIL import Image
-from pathlib import Path
+from fastapi import FastAPI, UploadFile
+from pydantic import BaseModel
 from tensorflow.keras.models import load_model
+import segmentation_models as sm
+import numpy as np
+
 from utils_and_constants import labels, TARGET_SIZE
 from data import ImageSegmentationDataset, DiceFocalLoss
 
@@ -17,7 +18,7 @@ from data import ImageSegmentationDataset, DiceFocalLoss
 app = FastAPI()
 
 # Dossier temporaire pour stocker les images
-cwd = Path(__file__).parent
+cwd = Path(os.getcwd())
 TEMP_DIR = cwd / "temp_images"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
