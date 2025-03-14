@@ -8,7 +8,7 @@ on:
 env:
     DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-    APP_NAME : app
+    APP_NAME : front
     DOCKER_IMAGE_PATH: hedredo/segmentation_ui:latest
   
   # Définition des jobs du workflow à exécuter
