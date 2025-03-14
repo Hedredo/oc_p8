@@ -3,6 +3,8 @@
 **Date de début du projet :** 17/01/2025<br>
 **Date de fin estimée du projet :** 14/03/2025
 
+email du projet : hedredoocp8@hotmail.com
+
 ## Description du projet
 Je suis ingénieur IA pôle R&D de Future Vision Transport > conception de systèmes embarqués de computer vision
 
