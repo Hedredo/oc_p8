@@ -1,7 +1,5 @@
 from collections import namedtuple
 
-API_HOST = "segmentation_api"
-
 # Instanciate the namedtuple Label
 Label = namedtuple(
     "Label",

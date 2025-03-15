@@ -1,7 +1,5 @@
 from collections import namedtuple
 
-# AJOUT D'un COMMENTAIRE POUR DECLENCHER LE GHA test 3
-
 # Instanciate the namedtuple Label
 Label = namedtuple(
     "Label",
