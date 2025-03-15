@@ -18,7 +18,7 @@ from data import ImageSegmentationDataset, DiceFocalLoss
 app = FastAPI()
 
 # Dossier temporaire pour stocker les images
-cwd = Path(os.getcwd())
+cwd = Path(__file__).parent
 TEMP_DIR = cwd / "temp_images"
 TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
