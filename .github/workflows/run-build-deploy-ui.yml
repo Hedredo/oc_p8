@@ -8,7 +8,7 @@ on:
 env:
     DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
     DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-    APP_NAME: front
+    APP_NAME: front # Nom du dossier contenant le code de l'interface utilisateur
     DOCKER_IMAGE_PATH: hedredo/segmentation_ui:latest
   
 jobs:

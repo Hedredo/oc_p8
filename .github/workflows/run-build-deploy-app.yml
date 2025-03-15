@@ -4,14 +4,11 @@ on:
     push:
       paths:
         - 'app/**'  # Exécuter le workflow uniquement si le code du conteneur est modifié
-      # Ajout d'une condition pour ignorer certains changements (optionnel)
-      paths-ignore:
-        - 'README.md'  # Ne pas déclencher pour des modifications de documentation
 
 env:
   DOCKER_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   DOCKER_PASSWORD: ${{ secrets.DOCKERHUB_PASSWORD }}
-  APP_NAME: app
+  APP_NAME: app # Nom du dossier contenant le code de l'API
   DOCKER_IMAGE_PATH: hedredo/segmentation_api:latest
 
 jobs:
