@@ -68,8 +68,8 @@ async def segment_image(id):
     payload = get_payload(image_path, mask_path)
 
     # Envoyer la requête POST en mode asynchrone
-    async with httpx.AsyncClient(timeout=30) as client:
-        response = await client.post(f"http://{API_HOST}:8000/predict/", json=payload)
+    async with httpx.AsyncClient(timeout=120) as client:
+        response = await client.post(f"{API_HOST}:8000/predict/", json=payload)
         response.raise_for_status()  # Lève une exception si le code HTTP n'est pas 200
     
     try:
