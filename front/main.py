@@ -2,6 +2,7 @@ import httpx
 import pandas as pd
 import gradio as gr
 import numpy as np
+from dotenv import load_dotenv
 import json
 import base64
 from io import BytesIO
@@ -9,15 +10,22 @@ import os
 from PIL import Image
 from pathlib import Path
 from constants import IMAGE_FOLDER
-from utils_and_constants import labels, API_HOST
+from utils_and_constants import labels
 
+# Récupérer le chemin du dossier contenant les images
 cwd = Path(__file__).parent
 folder_path = cwd / IMAGE_FOLDER
 filenames = os.listdir(folder_path)
 ids = sorted(set(filename.split("_")[2] for filename in filenames))
 
+# Récupére le dictionnaire de mapping id: category
 id2category = {label.categoryId: label.category for label in labels}
 
+# Récupére la variable d'environnement API_HOST
+load_dotenv()
+API_HOST = os.getenv("API_HOST")
+
+# Fonction pour charger le masque et l'image associés à un id
 def get_mask_and_image(id):
     mask, image = sorted(folder_path / filename for filename in filenames if id in filename and "color" not in filename)
     return image, mask
@@ -27,7 +35,7 @@ example_files = {
     id: get_mask_and_image(id) for id in ids # TODO: remplacer la clé par l'id de l'image
 }
 
-# Fonction pour charger l'image sélectionnée
+# Fonction pour charger l'image sélectionnée ou le GT en exemple
 def load_example(id):
     return example_files[id][0]
 
@@ -42,6 +50,7 @@ def encode_image(image_path):
     encoded_string = base64.b64encode(buffer.getvalue()).decode("utf-8")  # Convertir en string base64
     return encoded_string
 
+# Fonction pour construire le JSON à envoyer à l'API
 def get_payload(image_path, mask_path):
     # Construire le JSON
     payload = {
@@ -50,7 +59,7 @@ def get_payload(image_path, mask_path):
     }
     return payload
 
-# Bloc avec les fonctions
+# Fonction pour segmenter une image utilisée au déclenchement du bouton
 async def segment_image(id):
     # Charger l'image et le masque
     image_path, mask_path = get_mask_and_image(id)
@@ -70,8 +79,7 @@ async def segment_image(id):
         # Vérifier que la réponse contient bien des données attendues
     if not results:
         return {"error": "Réponse vide de l'API"}
-    print(type(results))
-    print(results)
+    # Crée les listes pour stocker les annotations, les prédictions, les classes et les scores
     mean_score = results[0]
     classes = []
     perclass_score = []
@@ -94,7 +102,7 @@ async def segment_image(id):
     df = pd.DataFrame({"class": classes, "iou": perclass_score})
     return (pil_image, gt_annotations), (pil_image, pred_annotations), (mean_score), (df)
 
-# Gradio code
+# Gradio code pour l'interface utilisateur
 with gr.Blocks() as demo:
     gr.Markdown("# Image Segmentation avec Liste Déroulante")
     with gr.Row():
