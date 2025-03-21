@@ -1,6 +1,6 @@
 from collections import namedtuple
 
-# Instanciate the namedtuple Label
+# Instanciate the namedtuple Label + gha
 Label = namedtuple(
     "Label",
     [
