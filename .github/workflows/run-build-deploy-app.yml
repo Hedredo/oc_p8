@@ -19,6 +19,13 @@ jobs:
       # Étape 1 : Cloner le dépôt
       - name: Checkout repository
         uses: actions/checkout@v3
+        with:
+          lfs: true
+
+      # Etape optionnel : Installer git lfs
+      - name: Pull Git LFS Files
+        run: |
+          git lfs pull
 
       # Étape 2 : Installer Python
       - name: Set up Python
