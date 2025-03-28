@@ -56,3 +56,120 @@ labels = [
 
 # Define the TARGET_SIZE VAR
 TARGET_SIZE = (256, 512)
+
+# Define the columns order for the comparative metrics table
+COL_ORDER = ['experiment_folder',
+ 'train_Dice',
+ 'train_IoU_class_0',
+ 'train_IoU_class_1',
+ 'train_IoU_class_2',
+ 'train_IoU_class_3',
+ 'train_IoU_class_4',
+ 'train_IoU_class_5',
+ 'train_IoU_class_6',
+ 'train_IoU_class_7',
+ 'train_MeanIoU',
+ 'train_Pixel_Accuracy',
+ 'train_loss',
+ 'val_Dice',
+ 'val_IoU_class_0',
+ 'val_IoU_class_1',
+ 'val_IoU_class_2',
+ 'val_IoU_class_3',
+ 'val_IoU_class_4',
+ 'val_IoU_class_5',
+ 'val_IoU_class_6',
+ 'val_IoU_class_7',
+ 'val_MeanIoU',
+ 'val_Pixel_Accuracy',
+ 'val_loss',
+ 'test_Dice',
+ 'test_IoU_class_0',
+ 'test_IoU_class_1',
+ 'test_IoU_class_2',
+ 'test_IoU_class_3',
+ 'test_IoU_class_4',
+ 'test_IoU_class_5',
+ 'test_IoU_class_6',
+ 'test_IoU_class_7',
+ 'test_MeanIoU',
+ 'test_Pixel_Accuracy',
+ 'test_loss',
+ 'best_epoch',
+ 'n_epochs',
+ 'n_steps',
+ 'model_name',
+ 'inference_time',
+ 'classes',
+ 'train_samples',
+ 'val_samples',
+ 'test_samples',
+ 'train_batches',
+ 'augmentations',
+ 'normalize',
+ 'loss_fn',
+ 'optimizer',
+ 'learning_rate']
+
+# Annotation des barplots ou autre
+def show_nums_axes(ax, orient="v", fmt=".0g", extra="", stacked=False):
+    """
+    Affiche les valeurs numériques sur les barres d'un graphique à barres.
+
+    Args:
+        ax (matplotlib.axes.Axes): L'axe du graphique.
+        fmt (str, optional): Format d'affichage des nombres
+        orient (str, optional): L'orientation des barres. 'v' pour vertical (par défaut), 'h' pour horizontal.
+        extra (str, optional): Texte additionnel à afficher sur les annotations. Ex. : " %"
+        stacked (bool, optionnal): S'adapte pour un barstackedplot
+
+    Returns:
+        None
+    """
+    # Error handling
+    if orient not in ["h", "v"]:
+        raise ValueError("orient doit être égal à 'h' ou 'v si spécifié")
+    try:
+        format(-10.5560, fmt)
+    except ValueError:
+        raise "Erreur: le format spécifié dans fmt n'est pas correct."
+    if not isinstance(stacked, bool):
+        raise ValueError("stacked doit être un booléen")
+    # Body
+    for p in ax.patches:
+        width, height = p.get_width(), p.get_height()
+        x, y = p.get_xy()
+        if orient == "v":
+            if not stacked:
+                ax.annotate(
+                    f"{height:{fmt}}{extra}" if height != 0 else "",
+                    (x + width / 2.0, height),
+                    ha="center",
+                    va="bottom",
+                )
+            else:
+                ax.annotate(
+                    f"{height:{fmt}}{extra}",
+                    (x + width - 4, y + height / 2),
+                    fontsize=10,
+                    fontweight="bold",
+                    ha="center",
+                    va="top",
+                )
+        else:
+            if not stacked:
+                ax.annotate(
+                    f"{width:{fmt}}{extra}" if width != 0 else "",
+                    (width, y + height / 2.0),
+                    ha="left",
+                    va="center",
+                )
+            else:
+                ax.annotate(
+                    f"{width:{fmt}}{extra}",
+                    (x + width - 1, y + height / 2),
+                    fontsize=10,
+                    fontweight="bold",
+                    ha="right",
+                    va="center",
+                )
