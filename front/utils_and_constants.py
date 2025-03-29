@@ -56,3 +56,6 @@ labels = [
 
 # Define the TARGET_SIZE VAR
 TARGET_SIZE = (256, 512)
+
+# Define the IMAGE_FOLDER VAR
+IMAGE_FOLDER = 'images'

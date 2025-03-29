@@ -12,7 +12,7 @@ import segmentation_models as sm
 import numpy as np
 
 from utils_and_constants import labels, TARGET_SIZE
-from data import ImageSegmentationDataset, DiceFocalLoss
+from classes import ImageSegmentationDataset, DiceFocalLoss
 
 
 app = FastAPI()
