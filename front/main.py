@@ -178,18 +178,18 @@ async def segment_image(id: str) -> Tuple[
 
 # Gradio code pour l'interface utilisateur
 with gr.Blocks() as demo:
-    gr.Markdown("# Image Segmentation avec Liste Déroulante")
+    gr.Markdown("# Segmentation d'image pour véhicule autonome")
     with gr.Row():
         dropdown = gr.Dropdown(
-            label="Choisissez un exemple",
+            label="Choisissez un label dans la liste déroulante",
             choices=list(example_files.keys()),
             value=list(example_files.keys())[0],  # Valeur par défaut
         )
     
     with gr.Row():
         image_input = gr.Image(value=list(example_files.values())[0][0], type="filepath", label="Image à segmenter")
-        gt_output = gr.AnnotatedImage(label="gt blending")
-        pred_output = gr.AnnotatedImage(label="pred blending")
+        gt_output = gr.AnnotatedImage(label="Ground Truth")
+        pred_output = gr.AnnotatedImage(label="Prediction")
 
         # Charger l'exemple sélectionné
         dropdown.change(fn=load_example, inputs=dropdown, outputs=image_input)

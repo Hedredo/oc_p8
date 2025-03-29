@@ -2,6 +2,15 @@
 
 Ce projet est structuré autour de trois composants principaux : les **Notebooks**, l'**API** et le **Front**.
 
+## Modélisation de segmentation d'images pour la conduite autonome
+
+Le projet vise à développer un modèle de segmentation d'images pour la conduite autonome. Il utilise des techniques avancées de traitement d'images et d'apprentissage automatique pour identifier et segmenter les objets dans les images de la route. Le modèle est entraîné sur le jeu de données Cityscapes, qui contient des images annotées de scènes urbaines.
+Le projet est divisé en plusieurs parties :
+- **Modélisation P1** : Conception et entraînement du modèle de segmentation d'images.
+- **Modélisation P2** : Amélioration du modèle avec des techniques avancées de traitement d'images et d'apprentissage automatique.
+- **API** : Développement d'une API pour interagir avec le modèle de segmentation.
+- **Front** : Création d'une interface utilisateur pour visualiser les résultats du modèle de segmentation.
+
 ## Notebooks
 
 Les notebooks situés dans le dossier [notebooks](notebooks/) contiennent des analyses de données, des explorations et des visualisations.  
